@@ -1,0 +1,945 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sudoku Bomb</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 20px 10px;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: white;
+  font-family: Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 480px;
+  text-align: center;
+}
+
+h1 {
+  color: #38bdf8;
+  margin-bottom: 5px;
+}
+
+.subtitle {
+  color: #94a3b8;
+  margin-bottom: 20px;
+}
+
+.info {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.info div {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 10px 3px;
+}
+
+.info span {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-bottom: 7px;
+}
+
+.info strong {
+  font-size: 17px;
+}
+
+#hearts {
+  font-size: 17px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.board-wrap {
+  position: relative;
+  width: 100%;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  width: 100%;
+  aspect-ratio: 1;
+  border: 3px solid #38bdf8;
+  background: #64748b;
+  gap: 1px;
+}
+
+.cell {
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: clamp(13px, 4.5vw, 22px);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cell.given {
+  background: #cbd5e1;
+  color: #334155;
+  font-weight: 800;
+}
+
+.cell.selected {
+  background: #7dd3fc;
+}
+
+.cell.related {
+  background: #e0f2fe;
+}
+
+.cell.same {
+  background: #bae6fd;
+}
+
+.cell.error {
+  background: #fecaca;
+  color: #b91c1c;
+}
+
+.cell.hint {
+  color: #0284c7;
+}
+
+.cell:nth-child(3n) {
+  border-right: 2px solid #64748b;
+}
+
+.cell:nth-child(9n) {
+  border-right: none;
+}
+
+.cell:nth-child(n+19):nth-child(-n+27),
+.cell:nth-child(n+46):nth-child(-n+54) {
+  border-bottom: 2px solid #64748b;
+}
+
+.numbers {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 5px;
+  margin-top: 15px;
+}
+
+button {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.numbers button {
+  padding: 12px 0;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #334155;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 9px;
+  margin-top: 15px;
+}
+
+.actions button {
+  padding: 12px 5px;
+  border: none;
+  border-radius: 9px;
+  background: #0284c7;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.actions .secondary {
+  background: #334155;
+}
+
+#message {
+  min-height: 25px;
+  margin-top: 15px;
+  color: #7dd3fc;
+  font-size: 14px;
+}
+
+#bombEffect {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+  background: rgba(239, 68, 68, 0.3);
+}
+
+#bombEffect.show {
+  display: flex;
+  animation: flash 0.65s ease-out;
+}
+
+.bomb-icon {
+  font-size: clamp(65px, 20vw, 100px);
+  animation: explode 0.65s ease-out;
+  filter: drop-shadow(0 0 15px orange);
+}
+
+@keyframes explode {
+  0% {
+    transform: scale(0.2) rotate(-20deg);
+    opacity: 0;
+  }
+  35% {
+    transform: scale(1.3) rotate(10deg);
+    opacity: 1;
+  }
+  65% {
+    transform: scale(1) rotate(-5deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes flash {
+  0%, 100% { background: rgba(239,68,68,0); }
+  25%, 55% { background: rgba(239,68,68,0.45); }
+}
+
+#gameOver {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgba(2, 6, 23, 0.88);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+#gameOver.show {
+  display: flex;
+}
+
+.gameover-card {
+  width: 100%;
+  max-width: 330px;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 18px;
+  padding: 28px 20px;
+  box-shadow: 0 15px 45px #0008;
+}
+
+.gameover-card h2 {
+  color: #f87171;
+  font-size: 28px;
+}
+
+.gameover-card p {
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+
+.gameover-card button {
+  padding: 13px 20px;
+  background: #0284c7;
+  color: white;
+  border: none;
+  border-radius: 9px;
+  font-weight: bold;
+  font-size: 15px;
+}
+
+@media (max-width: 350px) {
+  .cell {
+    font-size: 12px;
+  }
+
+  .info strong {
+    font-size: 14px;
+  }
+
+  #hearts {
+    font-size: 13px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h1>💣 Sudoku Bomb</h1>
+  <p class="subtitle">Isi angka dengan benar dan jaga nyawamu!</p>
+
+  <div class="info">
+    <div>
+      <span>WAKTU</span>
+      <strong id="timer">00:00</strong>
+    </div>
+    <div>
+      <span>NYAWA</span>
+      <strong id="hearts">❤️❤️❤️</strong>
+    </div>
+    <div>
+      <span>KESALAHAN</span>
+      <strong id="mistakes">0</strong>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <div id="board"></div>
+    <div id="bombEffect">
+      <span class="bomb-icon">💥</span>
+    </div>
+  </div>
+
+  <div class="numbers" id="numbers">
+    <button data-number="1">1</button>
+    <button data-number="2">2</button>
+    <button data-number="3">3</button>
+    <button data-number="4">4</button>
+    <button data-number="5">5</button>
+    <button data-number="6">6</button>
+    <button data-number="7">7</button>
+    <button data-number="8">8</button>
+    <button data-number="9">9</button>
+  </div>
+
+  <div class="actions">
+    <button id="checkBtn">✓ Periksa</button>
+    <button id="hintBtn">💡 Petunjuk</button>
+    <button id="eraseBtn" class="secondary">⌫ Hapus</button>
+    <button id="newBtn" class="secondary">↻ Game Baru</button>
+  </div>
+
+  <p id="message">Pilih kotak, lalu masukkan angka.</p>
+</div>
+
+<div id="gameOver">
+  <div class="gameover-card">
+    <div style="font-size:60px">💣</div>
+    <h2>GAME OVER!</h2>
+    <p>Nyawamu habis karena terlalu banyak jawaban salah.</p>
+    <p>Coba lagi dan berhati-hatilah!</p>
+    <button id="restartBtn">↻ Main Lagi</button>
+  </div>
+</div>
+
+<script>
+const puzzles = [
+  {
+    puzzle: [
+      "530070000",
+      "600195000",
+      "098000060",
+      "800060003",
+      "400803001",
+      "700020006",
+      "060000280",
+      "000419005",
+      "000080079"
+    ],
+    solution: [
+      "534678912",
+      "672195348",
+      "198342567",
+      "859761423",
+      "426853791",
+      "713924856",
+      "961537284",
+      "287419635",
+      "345286179"
+    ]
+  },
+  {
+    puzzle: [
+      "003020600",
+      "900305001",
+      "001806400",
+      "008102900",
+      "700000008",
+      "006708200",
+      "002609500",
+      "800203009",
+      "005010300"
+    ],
+    solution: [
+      "483921657",
+      "967345821",
+      "251876493",
+      "548132976",
+      "729564138",
+      "136798245",
+      "372689514",
+      "814253769",
+      "695417382"
+    ]
+  },
+  {
+    puzzle: [
+      "000260701",
+      "680070090",
+      "190004500",
+      "820100040",
+      "004602900",
+      "050003028",
+      "009300074",
+      "040050036",
+      "703018000"
+    ],
+    solution: [
+      "435269781",
+      "682571493",
+      "197834562",
+      "826195347",
+      "374682915",
+      "951743628",
+      "519326874",
+      "248957136",
+      "763418259"
+    ]
+  },
+  {
+    puzzle: [
+      "100920000",
+      "524010000",
+      "000000070",
+      "050008102",
+      "000000000",
+      "402700090",
+      "060000000",
+      "000030945",
+      "000071006"
+    ],
+    solution: [
+      "173926854",
+      "524817693",
+      "698534271",
+      "356498127",
+      "987162435",
+      "412753698",
+      "769245381",
+      "841639542",
+      "235871946"
+    ]
+  },
+  {
+    puzzle: [
+      "000000907",
+      "000420180",
+      "000705026",
+      "100904000",
+      "050000040",
+      "000507009",
+      "920108000",
+      "034059000",
+      "507000000"
+    ],
+    solution: [
+      "462831957",
+      "795426183",
+      "381795426",
+      "173984265",
+      "659312748",
+      "248567319",
+      "926178534",
+      "834259671",
+      "517643892"
+    ]
+  },
+  {
+    puzzle: [
+      "030050040",
+      "008010500",
+      "460000012",
+      "070502080",
+      "000603000",
+      "040109030",
+      "250000098",
+      "001020600",
+      "080060020"
+    ],
+    solution: [
+      "132657948",
+      "798214563",
+      "465398712",
+      "973542186",
+      "521863479",
+      "846179235",
+      "257431698",
+      "314928657",
+      "689765321"
+    ]
+  },
+  {
+    puzzle: [
+      "005300000",
+      "800000020",
+      "070010500",
+      "400005300",
+      "010070006",
+      "003200080",
+      "060500009",
+      "004000030",
+      "000009700"
+    ],
+    solution: [
+      "145327698",
+      "839654127",
+      "672918543",
+      "496185372",
+      "218473956",
+      "753296481",
+      "367542819",
+      "984761235",
+      "521839764"
+    ]
+  },
+  {
+    puzzle: [
+      "000000000",
+      "000003085",
+      "001020000",
+      "000507000",
+      "004000100",
+      "090000000",
+      "500000073",
+      "002010000",
+      "000040009"
+    ],
+    solution: [
+      "987654321",
+      "246173985",
+      "351928647",
+      "128537496",
+      "634289157",
+      "795461238",
+      "519862473",
+      "862719534",
+      "473345869"
+    ]
+  }
+];
+
+let board = [];
+let solution = [];
+let fixed = [];
+let selected = -1;
+let mistakes = 0;
+let lives = 3;
+let seconds = 10 * 60;
+let finished = false;
+let checking = false;
+let timerInterval;
+let bombTimeout;
+
+const boardElement = document.getElementById("board");
+const message = document.getElementById("message");
+const bombEffect = document.getElementById("bombEffect");
+
+  
+function startGame() {
+  clearInterval(timerInterval);
+  clearTimeout(bombTimeout);
+
+  bombEffect.classList.remove("show");
+  document.getElementById("gameOver").classList.remove("show");
+  
+  document.querySelector(".gameover-card h2").textContent =
+    "GAME OVER!";
+
+  document.querySelectorAll(".gameover-card p")[0].textContent =
+    "Nyawamu habis karena terlalu banyak jawaban salah.";
+
+  document.querySelectorAll(".gameover-card p")[1].textContent =
+    "Coba lagi dan berhati-hatilah!";
+
+  const game = puzzles[
+    Math.floor(Math.random() * puzzles.length)
+  ];
+
+  board = game.puzzle.join("").split("").map(Number);
+  solution = game.solution.join("").split("").map(Number);
+  fixed = board.map(n => n !== 0);
+
+  selected = -1;
+  mistakes = 0;
+  lives = 3;
+  seconds = 10 * 60;
+  finished = false;
+  checking = false;
+
+  updateStats();
+
+  const timerElement = document.getElementById("timer");
+  timerElement.textContent = "10:00";
+  timerElement.style.color = "#ffffff";
+
+  message.textContent =
+    "Pilih kotak, lalu masukkan angka.";
+
+  renderBoard();
+
+  timerInterval = setInterval(() => {
+    if (finished) return;
+
+    seconds--;
+
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+
+    timerElement.textContent =
+      String(minutes).padStart(2, "0") + ":" +
+      String(secs).padStart(2, "0");
+
+    timerElement.style.color =
+      seconds <= 60 ? "#ef4444" : "#ffffff";
+
+    if (seconds <= 0) {
+      seconds = 0;
+      finished = true;
+      clearInterval(timerInterval);
+
+      message.textContent =
+        "⏰ Waktu habis! Game over.";
+
+      document.querySelector(".gameover-card h2").textContent =
+        "⏰ WAKTU HABIS!";
+
+      document.querySelectorAll(".gameover-card p")[0].textContent =
+        "Waktumu telah habis. Coba lagi!";
+
+      document.querySelectorAll(".gameover-card p")[1].textContent =
+        "Tekan tombol di bawah untuk mengulang.";
+
+      document.getElementById("gameOver").classList.add("show");
+    }
+  }, 1000);
+}
+
+
+  updateStats();
+
+seconds = 10 * 60;
+
+document.getElementById("timer").textContent = "10:00";
+
+timerInterval = setInterval(() => {
+  if (finished) return;
+
+  seconds--;
+
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+
+  const timerElement = document.getElementById("timer");
+
+  timerElement.textContent =
+    String(minutes).padStart(2, "0") + ":" +
+    String(secs).padStart(2, "0");
+
+  // Timer berubah menjadi merah saat tersisa 1 menit
+  timerElement.style.color =
+    seconds <= 60 ? "#ef4444" : "#ffffff";
+
+  // Waktu habis
+  if (seconds <= 0) {
+    seconds = 0;
+    finished = true;
+    clearInterval(timerInterval);
+
+    message.textContent = "⏰ Waktu habis! Game over.";
+
+    document.getElementById("gameOver").classList.add("show");
+
+    document.querySelector(".gameover-card h2").textContent =
+      "⏰ WAKTU HABIS!";
+
+    document.querySelector(".gameover-card p").textContent =
+      "Waktumu telah habis. Coba lagi!";
+  }
+}, 1000);
+
+function updateStats() {
+  document.getElementById("mistakes").textContent = mistakes;
+
+  document.getElementById("hearts").textContent =
+    "❤️".repeat(lives) + "🖤".repeat(3 - lives);
+}
+
+function renderBoard() {
+  boardElement.innerHTML = "";
+
+  for (let i = 0; i < 81; i++) {
+    const cell = document.createElement("button");
+    const row = Math.floor(i / 9);
+    const col = i % 9;
+
+    cell.className = "cell";
+    cell.textContent = board[i] || "";
+
+    if (fixed[i]) cell.classList.add("given");
+
+    if (selected !== -1) {
+      const sr = Math.floor(selected / 9);
+      const sc = selected % 9;
+
+      if (i === selected) {
+        cell.classList.add("selected");
+      } else if (
+        row === sr ||
+        col === sc ||
+        (Math.floor(row / 3) === Math.floor(sr / 3) &&
+         Math.floor(col / 3) === Math.floor(sc / 3))
+      ) {
+        cell.classList.add("related");
+      }
+
+      if (board[selected] && board[i] === board[selected]) {
+        cell.classList.add("same");
+      }
+    }
+
+    if (checking && board[i] !== 0 &&
+        board[i] !== solution[i]) {
+      cell.classList.add("error");
+    }
+
+    cell.addEventListener("click", () => {
+      if (finished) return;
+
+      selected = i;
+      checking = false;
+      message.textContent = "Masukkan angka 1–9.";
+      renderBoard();
+    });
+
+    boardElement.appendChild(cell);
+  }
+}
+
+function explodeBomb() {
+  mistakes++;
+  lives--;
+
+  updateStats();
+
+  bombEffect.classList.remove("show");
+
+  // Memicu ulang animasi ledakan
+  void bombEffect.offsetWidth;
+  bombEffect.classList.add("show");
+
+  if (lives <= 0) {
+    finished = true;
+    clearInterval(timerInterval);
+
+    message.textContent = "💥 Nyawa habis! Game over.";
+
+    bombTimeout = setTimeout(() => {
+      bombEffect.classList.remove("show");
+      document.getElementById("gameOver").classList.add("show");
+    }, 700);
+
+    return;
+  }
+
+  message.textContent =
+    "💥 BOOM! Jawaban salah! Nyawa tersisa: " + lives;
+
+  bombTimeout = setTimeout(() => {
+    bombEffect.classList.remove("show");
+  }, 700);
+}
+
+function enterNumber(number) {
+  if (finished) return;
+
+  if (selected === -1) {
+    message.textContent = "Pilih kotak terlebih dahulu!";
+    return;
+  }
+
+  if (fixed[selected]) {
+    message.textContent = "Angka petunjuk tidak bisa diubah.";
+    return;
+  }
+
+  if (board[selected] === number) {
+    message.textContent = "Angka tersebut sudah terisi.";
+    return;
+  }
+
+  if (number === solution[selected]) {
+    board[selected] = number;
+    checking = false;
+
+    message.textContent = "✅ Benar! Lanjutkan.";
+    renderBoard();
+    checkWin();
+  } else {
+    explodeBomb();
+  }
+}
+
+document.getElementById("numbers").addEventListener(
+  "click", event => {
+    const button = event.target.closest("button");
+    if (!button) return;
+
+    enterNumber(Number(button.dataset.number));
+  }
+);
+
+document.getElementById("eraseBtn").addEventListener(
+  "click", () => {
+    if (finished) return;
+
+    if (selected === -1) {
+      message.textContent = "Pilih kotak terlebih dahulu.";
+      return;
+    }
+
+    if (fixed[selected]) {
+      message.textContent = "Angka petunjuk tidak bisa dihapus.";
+      return;
+    }
+
+    board[selected] = 0;
+    checking = false;
+
+    renderBoard();
+    message.textContent = "Angka berhasil dihapus.";
+  }
+);
+
+document.getElementById("checkBtn").addEventListener(
+  "click", () => {
+    if (finished) return;
+
+    if (board.includes(0)) {
+      message.textContent = "Masih ada kotak yang kosong!";
+      return;
+    }
+
+    const wrongIndex = board.findIndex(
+      (n, i) => n !== solution[i]
+    );
+
+    if (wrongIndex !== -1) {
+      selected = wrongIndex;
+      checking = true;
+      renderBoard();
+      explodeBomb();
+      return;
+    }
+
+    winGame();
+  }
+);
+
+document.getElementById("hintBtn").addEventListener(
+  "click", () => {
+    if (finished) return;
+
+    let index = selected;
+
+    if (index === -1 || fixed[index] || board[index] !== 0) {
+      index = board.findIndex(
+        (n, i) => n === 0 && !fixed[i]
+      );
+    }
+
+    if (index === -1) {
+      message.textContent = "Tidak ada kotak kosong.";
+      return;
+    }
+
+    selected = index;
+    board[index] = solution[index];
+
+    checking = false;
+    renderBoard();
+
+    boardElement.children[index].classList.add("hint");
+
+    message.textContent = "💡 Petunjuk berhasil diberikan.";
+
+    checkWin();
+  }
+);
+
+document.getElementById("newBtn").addEventListener(
+  "click", startGame
+);
+
+document.getElementById("restartBtn").addEventListener(
+  "click", startGame
+);
+
+function checkWin() {
+  if (board.every((n, i) => n === solution[i])) {
+    winGame();
+  }
+}
+
+function winGame() {
+  finished = true;
+  clearInterval(timerInterval);
+
+  message.textContent =
+    "🎉 Sudoku selesai! Waktu: " +
+    document.getElementById("timer").textContent;
+
+  renderBoard();
+}
+
+document.addEventListener("keydown", event => {
+  if (finished) return;
+
+  if (event.key >= "1" && event.key <= "9") {
+    enterNumber(Number(event.key));
+  } else if (
+    event.key === "Backspace" ||
+    event.key === "Delete"
+  ) {
+    document.getElementById("eraseBtn").click();
+  }
+});
+
+startGame();
+</script>
+
+</body>
+</html>
